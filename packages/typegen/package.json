@@ -20,5 +20,9 @@
   "license": "ISC",
   "peerDependencies": {
     "slonik": ">= 21.0.0 < 24"
+  },
+  "dependencies": {
+    "param-case": "^3.0.4",
+    "pascal-case": "^3.1.2"
   }
 }

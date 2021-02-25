@@ -10,6 +10,8 @@ import * as fs from 'fs'
 import {basename, join} from 'path'
 import {inspect} from 'util'
 import {EOL} from 'os'
+import {paramCase} from 'param-case'
+import {pascalCase} from 'pascal-case'
 
 const keys = <T>(obj: T) => Object.keys(obj) as Array<keyof T>
 const fromPairs = <K, V>(pairs: Array<[K, V]>) =>
@@ -227,7 +229,7 @@ export const setupSqlGetter = <KnownTypes>(config: TypeGenConfig<KnownTypes>): T
             _identifiers &&
               _identifiers.forEach(identifier =>
                 writeTypes(
-                  identifier,
+                  pascalCase(identifier),
                   result.fields.map(f => ({
                     name: f.name,
                     value: typescriptTypeName(f.dataTypeId),
@@ -280,7 +282,7 @@ const header = [
 ].join(EOL)
 
 const getFsTypeWriter = (generatedPath: string) => (typeName: string, properties: Property[], description: string) => {
-  const tsPath = join(generatedPath, `${typeName}.ts`)
+  const tsPath = join(generatedPath, `${paramCase(typeName)}.ts`)
   const existingContent = fs.existsSync(tsPath) ? fs.readFileSync(tsPath, 'utf8') : ''
   const metaDeclaration = `export const ${typeName}_meta_v0 = `
   const lines = existingContent.split(EOL).map(line => line.trim())
@@ -321,9 +323,9 @@ const getFsTypeWriter = (generatedPath: string) => (typeName: string, properties
     ``,
     `export type ${typeName}_UnionType = ${typeName}_QueryTypeMap[keyof ${typeName}_QueryTypeMap]`,
     ``,
-    `export type ${typeName} = {`,
-    `  [K in keyof ${typeName}_UnionType]: ${typeName}_UnionType[K]`,
-    `}`,
+    `export type ${typeName} = Partial<${uniqueTypes.map((t, idx) => `${typeName}_AllTypes[${idx}]`).join(' & ')}>`,
+    `export type ${typeName}Table = ${typeName}`,
+    ``,
     `export const ${typeName} = {} as ${typeName}`,
     ``,
     `${metaDeclaration}${JSON.stringify(_entries)}`,
@@ -335,24 +337,27 @@ const getFsTypeWriter = (generatedPath: string) => (typeName: string, properties
   const knownTypes = fs
     .readdirSync(generatedPath)
     .filter(filename => filename.endsWith('.ts') && filename !== 'index.ts')
-    .map(filename => basename(filename, '.ts'))
+    .map(filename => ({
+      filename: basename(filename, '.ts'),
+      name: filename.startsWith('_') ? basename(filename, '.ts') : pascalCase(basename(filename, '.ts')), // _pg_types
+    }))
 
   void writeIfChanged(
     join(generatedPath, `index.ts`),
     [
       header,
-      ...knownTypes.map(name => `import {${name}} from './${name}'`),
+      ...knownTypes.map(type => `import {${type.name}} from './${type.filename}'`),
       '',
-      ...knownTypes.map(name => `export {${name}}`),
+      ...knownTypes.map(type => `export {${type.name}}`),
       '',
       codegen.writeInterface(
         'KnownTypes',
-        knownTypes.map(name => ({name, value: name})),
+        knownTypes.map(type => ({name: type.name, value: type.name})),
       ),
       '',
       '/** runtime-accessible object with phantom type information of query results. */',
       `export const knownTypes: KnownTypes = {`,
-      ...knownTypes.map(name => `  ${name},`),
+      ...knownTypes.map(type => `  ${type.name},`),
       `}`,
       '',
     ].join(EOL),
