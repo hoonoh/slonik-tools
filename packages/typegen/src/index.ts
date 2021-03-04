@@ -12,6 +12,7 @@ import {inspect} from 'util'
 import {EOL} from 'os'
 import {paramCase} from 'param-case'
 import {pascalCase} from 'pascal-case'
+import {camelCase} from 'camel-case'
 
 const keys = <T>(obj: T) => Object.keys(obj) as Array<keyof T>
 const fromPairs = <K, V>(pairs: Array<[K, V]>) =>
@@ -257,14 +258,14 @@ export interface Property {
 const blockComment = (str?: string) => str && '/** ' + str.replace(/\*\//g, '') + ' */'
 const codegen = {
   writeInterface: (name: string, properties: Property[], description?: string) =>
-    `export interface ${name} ` + codegen.writeInterfaceBody(properties, description),
+    `export interface ${name} ` + codegen.writeInterfaceBody(properties, description, name),
 
-  writeInterfaceBody: (properties: Property[], description?: string) =>
+  writeInterfaceBody: (properties: Property[], description?: string, name?: string) =>
     [
       blockComment(description),
       `{`,
       ...properties.map(p =>
-        [blockComment(p.description), `${p.name}: ${p.value}`]
+        [blockComment(p.description), `${name === 'KnownTypes' ? p.name : camelCase(p.name)}: ${p.value}`]
           .filter(Boolean)
           .map(s => '  ' + s)
           .join(EOL),
